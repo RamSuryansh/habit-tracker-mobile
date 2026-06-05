@@ -10,17 +10,37 @@ import { Platform } from 'react-native';
 export const Colors = {
   light: {
     text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    background: '#F7F6F4',
+    backgroundElement: '#FFFFFF',
+    backgroundSelected: '#FFF2EC',
+    textSecondary: '#6F6A66',
+    accent: '#FF6F61',
+    accentSoft: '#FFF0E8',
+    accentWarm: '#FF9A72',
+    cardBorder: '#EEE8E3',
+    inputBackground: '#ECEBEA',
+    inactiveControl: '#BDB8B3',
+    navBackground: '#FFFFFF',
+    statusBarBackdrop: 'rgba(46, 38, 31, 0.10)',
+    success: '#8FC7B5',
+    warning: '#F7C59F',
   },
   dark: {
     text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    background: '#171412',
+    backgroundElement: '#24201D',
+    backgroundSelected: '#3A2A25',
+    textSecondary: '#D0C5BE',
+    accent: '#FF8D68',
+    accentSoft: '#3A251F',
+    accentWarm: '#FFB08C',
+    cardBorder: '#3C332F',
+    inputBackground: '#302A26',
+    inactiveControl: '#7C716A',
+    navBackground: '#24201D',
+    statusBarBackdrop: 'rgba(0, 0, 0, 0.32)',
+    success: '#8FC7B5',
+    warning: '#F7C59F',
   },
 } as const;
 
@@ -61,5 +81,5 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+export const BottomTabInset = Platform.select({ ios: 118, android: 118, web: 118 }) ?? 118;
 export const MaxContentWidth = 800;

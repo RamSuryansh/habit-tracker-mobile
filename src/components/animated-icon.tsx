@@ -1,33 +1,33 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 600;
+const SPLASH_BACKGROUND = '#FFE2A8';
 
 export function AnimatedSplashOverlay() {
   const [visible, setVisible] = useState(true);
+  const { height, width } = useWindowDimensions();
 
   if (!visible) return null;
 
+  const imageWidth = Math.min(width * 0.9, height * 0.44, 420);
   const splashKeyframe = new Keyframe({
     0: {
-      transform: [{ scale: INITIAL_SCALE_FACTOR }],
       opacity: 1,
+      transform: [{ scale: 1 }],
     },
-    20: {
+    65: {
       opacity: 1,
-    },
-    70: {
-      opacity: 0,
-      easing: Easing.elastic(0.7),
+      transform: [{ scale: 1 }],
     },
     100: {
       opacity: 0,
-      transform: [{ scale: 1 }],
-      easing: Easing.elastic(0.7),
+      transform: [{ scale: 1.02 }],
+      easing: Easing.out(Easing.cubic),
     },
   });
 
@@ -39,8 +39,13 @@ export function AnimatedSplashOverlay() {
           scheduleOnRN(setVisible, false);
         }
       })}
-      style={styles.backgroundSolidColor}
-    />
+      style={styles.backgroundSolidColor}>
+      <Image
+        contentFit="contain"
+        source={require('@/assets/images/habit-splash.png')}
+        style={[styles.splashImage, { width: imageWidth }]}
+      />
+    </Animated.View>
   );
 }
 
@@ -119,14 +124,19 @@ const styles = StyleSheet.create({
   },
   background: {
     borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
+    experimental_backgroundImage: `linear-gradient(180deg, #FFB951, #FF8F3F)`,
     width: 128,
     height: 128,
     position: 'absolute',
   },
   backgroundSolidColor: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#208AEF',
+    backgroundColor: SPLASH_BACKGROUND,
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1000,
+  },
+  splashImage: {
+    aspectRatio: 2 / 3,
   },
 });
