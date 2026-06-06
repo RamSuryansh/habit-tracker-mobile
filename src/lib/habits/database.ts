@@ -2,12 +2,20 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { addDays, formatDateKey, parseDateKey } from '@/lib/habits/dates';
 
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 const HISTORY_WINDOW_DAYS = 30;
 
 export const habitColors = ['#FF8D68', '#FF6F61', '#F7C59F', '#8FC7B5', '#8EA7E9', '#B9A7E8'];
 
-export const habitIconOptions = [
+export type HabitIconOption = {
+  emoji: string;
+  label: string;
+  category: string;
+  color: string;
+  isCustom?: boolean;
+};
+
+export const habitIconOptions: HabitIconOption[] = [
   { emoji: '🧘', label: 'Yoga', category: 'Wellness', color: habitColors[0] },
   { emoji: '🎵', label: 'Singing', category: 'Creative', color: habitColors[1] },
   { emoji: '📚', label: 'Reading', category: 'Learning', color: habitColors[2] },
@@ -16,7 +24,7 @@ export const habitIconOptions = [
   { emoji: '🎨', label: 'Drawing', category: 'Creative', color: habitColors[2] },
   { emoji: '🚴', label: 'Cycling', category: 'Fitness', color: habitColors[3] },
   { emoji: '💧', label: 'Water', category: 'Health', color: habitColors[4] },
-] as const;
+];
 
 export type HabitFrequency = 'daily' | 'weekdays' | 'weekends' | 'custom';
 export type WeekStartsOn = 'monday' | 'sunday';
@@ -147,6 +155,7 @@ export async function migrateDatabase(db: SQLiteDatabase) {
   const currentDbVersion = result?.user_version ?? 0;
 
   if (currentDbVersion >= DATABASE_VERSION) {
+    await ensureNotificationTable(db);
     await ensureDefaultSettings(db);
     await ensureDefaultProfile(db);
     return;
@@ -188,6 +197,14 @@ export async function migrateDatabase(db: SQLiteDatabase) {
       value TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS habit_notification_ids (
+      habit_id INTEGER NOT NULL,
+      notification_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY(habit_id, notification_id),
+      FOREIGN KEY(habit_id) REFERENCES habits(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS user_profile (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       display_name TEXT NOT NULL,
@@ -208,6 +225,7 @@ export async function migrateDatabase(db: SQLiteDatabase) {
   `);
 
   await ensureHabitColumns(db);
+  await ensureNotificationTable(db);
   await db.runAsync("UPDATE habits SET start_date = DATE(created_at) WHERE start_date = ''");
   await ensureDefaultSettings(db);
   await ensureDefaultProfile(db);
@@ -509,6 +527,58 @@ export async function setAppSetting<Key extends keyof AppSettings>(
   await setSetting(db, key, value);
 }
 
+export async function getCustomHabitIcons(db: SQLiteDatabase) {
+  return normalizeCustomHabitIcons(await getSetting<HabitIconOption[]>(db, 'customHabitIcons', []));
+}
+
+export async function addCustomHabitIcon(db: SQLiteDatabase, icon: HabitIconOption) {
+  const normalized = normalizeCustomHabitIcons([icon])[0];
+
+  if (!normalized) {
+    throw new Error('Choose an emoji and label for your custom icon.');
+  }
+
+  const currentIcons = await getCustomHabitIcons(db);
+  const nextIcons = [
+    ...currentIcons.filter(
+      (current) =>
+        current.emoji.toLocaleLowerCase() !== normalized.emoji.toLocaleLowerCase() ||
+        current.label.toLocaleLowerCase() !== normalized.label.toLocaleLowerCase()
+    ),
+    normalized,
+  ];
+
+  await setSetting(db, 'customHabitIcons', nextIcons);
+  return nextIcons;
+}
+
+export async function listHabitNotificationIds(db: SQLiteDatabase, habitId: number) {
+  const rows = await db.getAllAsync<{ notification_id: string }>(
+    'SELECT notification_id FROM habit_notification_ids WHERE habit_id = ?',
+    habitId
+  );
+
+  return rows.map((row) => row.notification_id);
+}
+
+export async function replaceHabitNotificationIds(db: SQLiteDatabase, habitId: number, notificationIds: string[]) {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM habit_notification_ids WHERE habit_id = ?', habitId);
+
+    for (const notificationId of notificationIds) {
+      await db.runAsync(
+        'INSERT INTO habit_notification_ids (habit_id, notification_id) VALUES (?, ?)',
+        habitId,
+        notificationId
+      );
+    }
+  });
+}
+
+export async function clearHabitNotificationIds(db: SQLiteDatabase, habitId: number) {
+  await db.runAsync('DELETE FROM habit_notification_ids WHERE habit_id = ?', habitId);
+}
+
 export async function getUserProfile(db: SQLiteDatabase) {
   await ensureDefaultProfile(db);
   const row = await db.getFirstAsync<{
@@ -623,6 +693,18 @@ async function ensureHabitColumns(db: SQLiteDatabase) {
       await db.execAsync(`ALTER TABLE habits ADD COLUMN ${name} ${definition}`);
     }
   }
+}
+
+async function ensureNotificationTable(db: SQLiteDatabase) {
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS habit_notification_ids (
+      habit_id INTEGER NOT NULL,
+      notification_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY(habit_id, notification_id),
+      FOREIGN KEY(habit_id) REFERENCES habits(id) ON DELETE CASCADE
+    );
+  `);
 }
 
 async function ensureDefaultSettings(db: SQLiteDatabase) {
@@ -776,6 +858,36 @@ function normalizeHabitInput(input: HabitInput) {
     targetCount: Math.max(1, Math.min(999, Math.round(input.targetCount || 1))),
     targetUnit: input.targetUnit.trim() || 'check-in',
   };
+}
+
+function normalizeCustomHabitIcons(icons: HabitIconOption[]) {
+  if (!Array.isArray(icons)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+
+  return icons
+    .map((icon) => ({
+      emoji: icon.emoji.trim().slice(0, 8),
+      label: icon.label.trim().slice(0, 24),
+      category: icon.category.trim().slice(0, 24) || 'Custom',
+      color: habitColors.includes(icon.color) ? icon.color : habitColors[0],
+      isCustom: true,
+    }))
+    .filter((icon) => {
+      if (!icon.emoji || !icon.label) {
+        return false;
+      }
+
+      const key = `${icon.emoji.toLocaleLowerCase()}-${icon.label.toLocaleLowerCase()}`;
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
 }
 
 function mapHabitRow(row: HabitRow): Habit {

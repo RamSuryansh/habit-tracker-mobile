@@ -1,7 +1,7 @@
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { initialWindowMetrics, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import AppTabs from '@/components/app-tabs';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { migrateDatabase } from '@/lib/habits/database';
+import { configureHabitNotifications } from '@/lib/habits/notifications';
 
 const sqliteOptions = { enableChangeListener: process.env.EXPO_OS !== 'web' };
 
@@ -30,6 +31,10 @@ function AppChrome() {
   const theme = useTheme();
   const topInset = Math.max(insets.top, 0);
   const topBarHeight = topInset ? topInset + Spacing.two : 0;
+
+  useEffect(() => {
+    configureHabitNotifications();
+  }, []);
 
   return (
     <>

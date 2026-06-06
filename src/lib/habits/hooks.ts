@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from 'react';
 
 import {
   archiveHabit,
+  addCustomHabitIcon,
   createHabit,
   getAppSettings,
   getCalendarMonth,
+  getCustomHabitIcons,
   getHabitAnalytics,
   getUserProfile,
   type AppSettings,
+  type HabitIconOption,
   type HabitAnalytics,
   type HabitHistoryDay,
   type HabitInput,
@@ -21,6 +24,7 @@ import {
   updateHabit,
   updateUserProfile,
 } from '@/lib/habits/database';
+import { cancelHabitReminders, prepareHabitReminder, syncHabitReminders } from '@/lib/habits/notifications';
 
 const HABIT_TABLES = ['habits', 'habit_completions'];
 const SETTINGS_TABLES = ['settings'];
@@ -47,14 +51,19 @@ export function useHabits(date: string) {
     isLoading,
     reload,
     createHabit: async (input: HabitInput) => {
-      await createHabit(db, input);
+      await prepareHabitReminder(input);
+      const habitId = await createHabit(db, input);
+      await syncHabitReminders(db, habitId, input);
       await reload();
     },
     updateHabit: async (id: number, input: HabitInput) => {
+      await prepareHabitReminder(input);
       await updateHabit(db, id, input);
+      await syncHabitReminders(db, id, input);
       await reload();
     },
     archiveHabit: async (id: number) => {
+      await cancelHabitReminders(db, id);
       await archiveHabit(db, id);
       await reload();
     },
@@ -161,6 +170,34 @@ export function useUserProfile() {
   );
 
   return { profile, isLoading, reload, saveProfile };
+}
+
+export function useCustomHabitIcons() {
+  const db = SQLite.useSQLiteContext();
+  const [icons, setIcons] = useState<HabitIconOption[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      setIcons(await getCustomHabitIcons(db));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [db]);
+
+  useLiveDatabaseReload(reload, SETTINGS_TABLES);
+
+  const saveCustomIcon = useCallback(
+    async (icon: HabitIconOption) => {
+      const nextIcons = await addCustomHabitIcon(db, icon);
+      setIcons(nextIcons);
+      return nextIcons;
+    },
+    [db]
+  );
+
+  return { icons, isLoading, reload, saveCustomIcon };
 }
 
 function useLiveDatabaseReload(reload: () => Promise<void>, tableNames: string[]) {

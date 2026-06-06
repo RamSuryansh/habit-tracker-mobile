@@ -1,5 +1,6 @@
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
-import type { StyleProp, ViewStyle } from 'react-native';
+import { Text } from 'react-native';
+import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 
 type SymbolName = SymbolViewProps['name'];
 
@@ -35,7 +36,30 @@ export function HabitSymbolIcon({
   size?: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  return <SymbolIcon color={color} name={habitSymbolNames[symbol] ?? habitSymbolNames.default} size={size} style={style} />;
+  const symbolName = habitSymbolNames[symbol];
+
+  if (symbolName) {
+    return <SymbolIcon color={color} name={symbolName} size={size} style={style} />;
+  }
+
+  return (
+    <Text
+      allowFontScaling={false}
+      style={[
+        {
+          color,
+          fontSize: Math.round(size * 0.78),
+          height: size,
+          includeFontPadding: false,
+          lineHeight: size,
+          textAlign: 'center',
+          width: size,
+        },
+        style as StyleProp<TextStyle>,
+      ]}>
+      {symbol}
+    </Text>
+  );
 }
 
 const habitSymbolNames: Record<string, SymbolName> = {

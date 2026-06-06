@@ -45,6 +45,13 @@
     "plugins": [
       "expo-router",
       [
+        "expo-notifications",
+        {
+          "color": "#FF6F61",
+          "defaultChannel": "habit-reminders"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#FFE2A8",
